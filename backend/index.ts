@@ -100,7 +100,7 @@ app.post("/login", authMiddleware, async (req, res) => {
 });
 
 app.post("/order", authMiddleware, async (req, res) => {
-  const userId = req.body;
+  const userId = req.userId;
   const { side, type, symbol, price, qty } = req.body;
   const identifier = Math.random()
   await client.lPush("incoming-queue", JSON.stringify({
@@ -118,8 +118,8 @@ app.post("/order", authMiddleware, async (req, res) => {
   res.json({ message: "Order Placed!", data: returnedData.data })
 });
 
-app.delete("/order/:orderId", async (req, res) => {
-  const userId = req.body;
+app.delete("/order/:orderId", authMiddleware, async (req, res) => {
+  const userId = req.userId;
   const orderId = req.params.orderId
   const identifier = Math.random()
 
@@ -139,11 +139,11 @@ app.delete("/order/:orderId", async (req, res) => {
 });
 
 app.get("/orders", authMiddleware, async (req, res) => {
-  const userId = req.body;
+  const userId = req.userId;
   const identifier = Math.random()
 
   await client.lPush("incoming-queue", JSON.stringify({
-    type: "get_all_order",
+    type: "get_all_orders",
     payload: { userId },
     identifier,
     responseQueue: "response-queue-" + QUEUE_ID
@@ -158,7 +158,7 @@ app.get("/orders", authMiddleware, async (req, res) => {
 });
 
 app.get("/orders/:orderId", authMiddleware, async (req, res) => {
-  const userId = req.body;
+  const userId = req.userId;
   const orderId = req.params.orderId
   const identifier = Math.random()
 
@@ -220,7 +220,7 @@ app.get("/stocks", (req, res) => {
 });
 
 app.get("/balance", authMiddleware, async (req, res) => {
-  const userId = req.body;
+  const userId = req.userId;
   const identifier = Math.random()
 
   await client.lPush("incoming-queue", JSON.stringify({
