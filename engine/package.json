@@ -1,0 +1,17 @@
+{
+  "name": "engine",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "crypto": "^1.0.1",
+    "redis": "^5.12.1",
+    "redis-cli": "^2.1.2"
+  }
+}
