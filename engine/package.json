@@ -10,8 +10,10 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@types/ws": "^8.18.1",
     "crypto": "^1.0.1",
     "redis": "^5.12.1",
-    "redis-cli": "^2.1.2"
+    "redis-cli": "^2.1.2",
+    "ws": "^8.21.0"
   }
 }

@@ -81,8 +81,8 @@ export interface Fill {
 }
 
 export interface OrderBook {
-  bids: RestingOrder[];
-  asks: RestingOrder[];
+  bids: Record<string, RestingOrder[]>;
+  asks: Record<string, RestingOrder[]>;
 }
 
 export interface CancelOrder {
