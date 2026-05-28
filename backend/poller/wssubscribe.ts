@@ -43,7 +43,11 @@ wss.on("connection", (ws) => {
     for (const key of mySubscriptions) {
       const room = subscribers.get(key)
       if (room) {
-        room.delete(ws)
+        room.delete(ws);
+        if (room.size === 0) {
+          subscribers.delete(key);
+          subscriber.unsubscribe(key);
+        }
       }
     }
   })
