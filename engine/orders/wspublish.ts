@@ -1,27 +1,25 @@
-import { ORDERBOOK } from '../types/types.ts'
+import { ORDERBOOK, type RestingOrder } from '../types/types.ts'
 import WebSocket, { WebSocketServer } from "ws";
 import { createClient } from "redis";
+import { getAllOrders } from './orderbook.ts';
 
 const publisher = createClient({ url: process.env.REDIS_URL });
 await publisher.connect()
 
-function publishDepth(symbol: string) {
+export function publishDepth(symbol: string) {
   const orderbook = ORDERBOOK[symbol]
-  if (!orderbook) throw new Error("Doesn't Exist!")
+  if (!orderbook) return;
 
-  const bids = Object.entries(orderbook.bids)
-    .sort(([a], [b]) => Number(b) - Number(a))
-    .map(([price, orders]) => [
-      price,
-      orders.reduce((sum: number, o: any) => sum + o.qty, 0)
-    ])
+  const aggregateSide = (orders: RestingOrder[]) => {
+    const counts: Record<number, number> = {};
+    orders.forEach(o => {
+      counts[o.price] = (counts[o.price] || 0) + o.qty;
+    });
+    return Object.entries(counts).map(([price, qty]) => [Number(price), qty]);
+  }
 
-  const asks = Object.entries(orderbook.asks)
-    .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([price, orders]) => [
-      price,
-      orders.reduce((sum: number, o: any) => sum + o.qty, 0)
-    ])
+  const bids = aggregateSide(orderbook.bids).sort(([a], [b]) => b - a);
+  const asks = aggregateSide(orderbook.asks).sort(([a], [b]) => a - b);
 
 
   publisher.publish(`depth:${symbol}`, JSON.stringify({ bids, asks }))

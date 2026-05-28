@@ -1,5 +1,6 @@
 import type { Balance, CancelOrder, CreateOrder, OrderRecord, OrderStatus, RestingOrder, Fill, DepthResponse } from "../types/types.ts";
 import { BALANCES, ORDERS, ORDERBOOK, FILLS } from "../types/types.ts";
+import { publishDepth } from '../orders/wspublish.ts'
 
 
 function getBalance(userId: string, symbol: string) {
@@ -29,6 +30,7 @@ function settleTrade(buyerId: string, sellerId: string, qty: number, price: numb
 export function createOrder(input: CreateOrder) {
   const { userId, price, qty, side, type, symbol } = input;
   const totalCost = (price || 0) * qty
+  if (type === "market") throw new Error("Market orders are not supported yet.")
 
 
   if (side === "buy") {
@@ -126,6 +128,8 @@ export function createOrder(input: CreateOrder) {
       status: order.status as OrderStatus
     });
   }
+
+  publishDepth(symbol);
 
   return {
     message: "Order Processed!",
