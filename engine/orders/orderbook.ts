@@ -32,7 +32,6 @@ export function createOrder(input: CreateOrder) {
   const totalCost = (price || 0) * qty
   if (type === "market") throw new Error("Market orders are not supported yet.")
 
-
   if (side === "buy") {
     if (getBalance(userId, "INR").available < totalCost) {
       throw new Error("Low funds!")
@@ -191,8 +190,19 @@ export function cancelOrder(input: CancelOrder) {
 
   const side = order.side === "buy" ? orderbook.bids : orderbook.asks
   const index = side.findIndex(o => o.orderId === orderId);
-
   if (index !== -1) side.splice(index, 1)
+
+  if (order.side === "buy") {
+    const remainingQty = order.qty - order.filledQty;
+    const refund = remainingQty - order.price!;
+    getBalance(userId, "INR").locked -= refund;
+    getBalance(userId, "INR").available += refund;
+  } else {
+    const remainingQty = order.qty - order.filledQty;
+    getBalance(userId, order.symbol).locked -= remainingQty;
+    getBalance(userId, order.symbol).available -= remainingQty;
+  }
+
   order.status = "cancelled"
   return { message: "Order cancelled" };
 }
