@@ -2,29 +2,38 @@ export type Side = "buy" | "sell"
 export type OrderType = "market" | "limit"
 export type OrderStatus = "open" | "partial" | "filled" | "cancelled"
 
-export type EngineCommandType =
-  | "create_order"
-  | "get_depth"
-  | "get_user_balance"
-  | "get_order"
-  | "get_fills"
-  | "get_all_orders"
-  | "cancel_order";
+export type ToEngine =
+  | { messageType: "create_order"; userId: string; symbol: string; side: Side; type: OrderType; price: number | null; qty: number; }
+  | { messageType: "get_depth"; symbol: string; }
+  | { messageType: "get_user_balance"; userId: string; }
+  | { messageType: "get_order"; orderId: string; }
+  | { messageType: "get_fills"; symbol: string; }
+  | { messageType: "get_all_orders"; userId: string; }
+  | { messageType: "cancel_order"; userId: string, orderId: string }
+  | { messageType: "create_market"; marketId: number }
+  | { messageType: "onramp"; userId: string, amount: string; }
 
-export interface EngineRequest {
-  identifier: string;
-  responseQueue: string;
-  type: EngineCommandType;
-  payload: Record<string, unknown>;
+export type EngineRequest = ToEngine & {
+  loopbackId: string;
 }
 
 export interface EngineResponse {
-  identifier: string;
+  loopbackId: string;
   ok: boolean;
   data?: unknown;
   error?: string;
 }
 
+export interface RedisStreamResponse {
+  name: string;
+  messages: {
+    id: string;
+    message: {
+      loopbackId: string,
+      [key: string]: any;
+    }
+  }[]
+}
 export interface RestingOrder {
   orderId: string;
   userId: string;
@@ -56,14 +65,6 @@ export interface OrderRecord {
   fills: Fill[];
   createdAt: number;
 }
-export interface CreateOrder {
-  userId: string;
-  type: OrderType;
-  side: Side;
-  symbol: string;
-  price: number | null;
-  qty: number;
-}
 
 export interface DepthLevel {
   price: number;
@@ -83,11 +84,6 @@ export interface Fill {
 export interface OrderBook {
   bids: RestingOrder[];
   asks: RestingOrder[];
-}
-
-export interface CancelOrder {
-  userId: string;
-  orderId: string;
 }
 
 export interface DepthResponse {
