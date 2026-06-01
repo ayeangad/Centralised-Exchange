@@ -1,12 +1,11 @@
 import jwt from "jsonwebtoken"
-import express, { request } from "express"
+import express from "express"
 import brycpt from "bcrypt"
-import { Pool } from "pg"
-import { PrismaPg } from "@prisma/adapter-pg"
 import { authMiddleware } from "./auth/middleware.ts"
-import { PrismaClient } from "./generated/prisma"
+import { PrismaPg } from "@prisma/adapter-pg"
+import { PrismaClient } from "../generated/prisma"
 import { createClient } from "redis"
-import { pendingQueues, QUEUE_ID } from "./poller/pending-queue.ts"
+import { loopback } from "./poller/pending-queue.ts"
 import z from "zod"
 import { BALANCES, STOCKS } from "../engine/types/types.ts"
 
@@ -17,17 +16,8 @@ const client = await createClient({
   .on("error", (err) => console.log("Redis Client Error", err))
   .connect()
 
-
-const subscriber = await createClient({
-  url: process.env.REDIS_URL
-})
-  .on("error", (err) => console.log("Redis Client Error", err))
-  .connect()
-
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool)
-const prisma = new PrismaClient({ adapter })
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+const prisma = new PrismaClient({ adapter });
 const app = express();
 app.use(express.json());
 
@@ -106,8 +96,7 @@ app.post("/order", authMiddleware, async (req, res) => {
   await client.lPush("incoming-queue", JSON.stringify({
     type: "create_order",
     payload: { side, type, symbol, price, qty, userId },
-    identifier,
-    responseQueue: "response-queue-" + QUEUE_ID
+    identifier
   }))
 
   const returnedData = await pendingQueues(identifier);
@@ -117,6 +106,28 @@ app.post("/order", authMiddleware, async (req, res) => {
   }
   res.json({ message: "Order Placed!", data: returnedData.data })
 });
+
+app.post("/admin/market", async (req, res) => {
+  const { symbol, imageUrl } = req.body;
+  const response = await prisma.market.upsert({
+    where: { slug: symbol },
+    update: { imageUrl },
+    create: { slug: symbol, imageUrl },
+  });
+
+  const queueLoopbackResponse = await loopback({
+    messageType: "create_market",
+    marketId: response.id
+  });
+
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Loopback failed" });
+    return;
+  }
+
+  res.json({ message: "Market created!", id: response.id });
+});
+
 
 app.delete("/order/:orderId", authMiddleware, async (req, res) => {
   const userId = req.userId;
