@@ -7,8 +7,9 @@ function readEnv(name: string): string {
 }
 
 export const env = {
-  redisUrl: Number(process.env.REDIS_URL),
+  redisUrl: readEnv("REDIS_URL"),
   jwtSecret: readEnv("JWT_SECRET"),
   adminSecret: readEnv("ADMIN_SECRET"),
   databaseUrl: readEnv("DATABASE_URL")
 }
+
