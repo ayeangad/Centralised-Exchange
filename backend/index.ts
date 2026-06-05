@@ -125,7 +125,6 @@ app.post("/admin/market", async (req, res) => {
   res.json({ message: "Market created!", id: response.id });
 });
 
-
 app.delete("/order/:orderId", authMiddleware, async (req, res) => {
   const userId = req.userId;
   if (!userId) return
@@ -200,6 +199,21 @@ app.get("/fills/:symbol", authMiddleware, async (req, res) => {
   }
   res.json({ message: `${symbol} fills`, data: queueLoopbackResponse })
 });
+
+app.get("equity/available", authMiddleware, async (req, res) => {
+  const userId = req.userId
+  if (!userId) return;
+
+  const queueLoopbackResponse = loopback({
+    messageType: "available_equity", userId
+  })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Loopback failed" });
+    return;
+  }
+
+  res.json({ message: "Here is your available equity!", data: queueLoopbackResponse })
+})
 
 app.get("/stocks", (req, res) => {
   res.json({ data: STOCKS });
