@@ -1,17 +1,19 @@
 export type Side = "buy" | "sell"
 export type OrderType = "market" | "limit"
+export type PerpType = "long" | "short"
 export type OrderStatus = "open" | "partial" | "filled" | "cancelled"
 
 export type ToEngine =
   | { messageType: "create_order"; userId: string; symbol: string; side: Side; type: OrderType; price: number | null; qty: number; }
   | { messageType: "get_depth"; symbol: string; }
   | { messageType: "get_user_balance"; userId: string; }
-  | { messageType: "get_order"; orderId: string; }
+  | { messageType: "get_order"; userId: string; orderId: string; }
   | { messageType: "get_fills"; symbol: string; }
   | { messageType: "get_all_orders"; userId: string; }
   | { messageType: "cancel_order"; userId: string, orderId: string }
   | { messageType: "create_market"; marketId: number }
   | { messageType: "onramp"; userId: string, amount: string; }
+  | { messageType: "available_equity"; userId: string; }
 
 export type EngineRequest = ToEngine & {
   loopbackId: string;
@@ -24,6 +26,13 @@ export interface EngineResponse {
   error?: string;
 }
 
+export type OpenOrder = {
+  userId: string,
+  originalOrderId: string,
+  qty: string,
+  filledQty: string
+}
+
 export interface RedisStreamResponse {
   name: string;
   messages: {
@@ -34,6 +43,31 @@ export interface RedisStreamResponse {
     }
   }[]
 }
+
+export interface PerpOrder {
+  orderId: string;
+  market: string;
+  perpType: PerpType;
+  qty: string;
+  margin: number;
+  type: OrderType;
+  price: number;
+  status: OrderStatus;
+}
+
+export interface Position {
+  market: string;
+  type: OrderType;
+  margin: number;
+  liquidationPrice: number;
+  averagePrce: number;
+}
+
+export interface Collateral {
+  available: number,
+  locked: number
+}
+
 export interface RestingOrder {
   orderId: string;
   userId: string;
@@ -45,6 +79,7 @@ export interface RestingOrder {
   filledQty: number;
   status: OrderStatus;
   createdAt: number;
+  openOrders: OpenOrder[]
 }
 
 export interface Balance {
@@ -84,6 +119,8 @@ export interface Fill {
 export interface OrderBook {
   bids: RestingOrder[];
   asks: RestingOrder[];
+  marketId: string;
+  lastTradedPrice: number;
 }
 
 export interface DepthResponse {
