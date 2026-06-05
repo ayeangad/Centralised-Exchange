@@ -4,19 +4,13 @@ import brycpt from "bcrypt"
 import { authMiddleware } from "./auth/middleware.ts"
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "../generated/prisma"
-import { createClient } from "redis"
 import { loopback } from "./poller/pending-queue.ts"
 import z from "zod"
 import { BALANCES, STOCKS } from "../engine/types/types.ts"
+import { env } from "./auth/env.ts"
 
 
-const client = await createClient({
-  url: process.env.REDIS_URL
-})
-  .on("error", (err) => console.log("Redis Client Error", err))
-  .connect()
-
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+const adapter = new PrismaPg({ connectionString: env.databaseUrl })
 const prisma = new PrismaClient({ adapter });
 const app = express();
 app.use(express.json());
@@ -60,7 +54,7 @@ app.post("/signup", async (req, res) => {
   res.json({ message: "Signed Up!" })
 });
 
-app.post("/login", authMiddleware, async (req, res) => {
+app.post("/login", async (req, res) => {
   const { username, password } = req.body
   const userExists = await prisma.user.findUnique({ where: { username } })
 
@@ -82,7 +76,7 @@ app.post("/login", authMiddleware, async (req, res) => {
 
   const token = jwt.sign({
     userId: userExists.id
-  }, "angadsecretcode123")
+  }, env.jwtSecret)
 
   res.json({
     token
@@ -91,34 +85,37 @@ app.post("/login", authMiddleware, async (req, res) => {
 
 app.post("/order", authMiddleware, async (req, res) => {
   const userId = req.userId;
+  if (!userId) return;
   const { side, type, symbol, price, qty } = req.body;
-  const identifier = Math.random()
-  await client.lPush("incoming-queue", JSON.stringify({
-    type: "create_order",
-    payload: { side, type, symbol, price, qty, userId },
-    identifier
-  }))
-
-  const returnedData = await pendingQueues(identifier);
-  if (!returnedData.ok) {
-    res.status(400).json({ message: returnedData.error })
+  const queueLoopbackResponse = await loopback({
+    messageType: "create_order", userId, side, type, symbol, price, qty
+  })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Loopback failed" });
     return;
   }
-  res.json({ message: "Order Placed!", data: returnedData.data })
+  res.json({ message: "Order Placed!", data: queueLoopbackResponse })
 });
 
 app.post("/admin/market", async (req, res) => {
+  const token = req.headers.authorization
+  if (token !== env.adminSecret) {
+    res.status(401).json()
+    return;
+  }
   const { symbol, imageUrl } = req.body;
   const response = await prisma.market.upsert({
     where: { slug: symbol },
     update: { imageUrl },
     create: { slug: symbol, imageUrl },
   });
-
+  const start = performance.now();
   const queueLoopbackResponse = await loopback({
     messageType: "create_market",
     marketId: response.id
   });
+  const end = performance.now();
+  console.log(`Matching engine latency: ${(end - start).toFixed(2)}ms`);
 
   if (!queueLoopbackResponse) {
     res.status(403).json({ message: "Loopback failed" });
@@ -131,99 +128,77 @@ app.post("/admin/market", async (req, res) => {
 
 app.delete("/order/:orderId", authMiddleware, async (req, res) => {
   const userId = req.userId;
+  if (!userId) return
   const orderId = req.params.orderId
-  const identifier = Math.random()
+  if (!orderId) return;
 
-  await client.lPush("incoming-queue", JSON.stringify({
-    type: "cancel_order",
-    payload: { userId, orderId },
-    identifier,
-    responseQueue: "response-queue-" + QUEUE_ID
-  }))
+  const queueLoopbackResponse = await loopback({
+    messageType: "cancel_order", userId, orderId: String(orderId)
+  })
 
-  const returnedData = await pendingQueues(identifier);
-  if (!returnedData.ok) {
-    res.status(400).json({ message: returnedData.error })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Loopback failed" });
     return;
   }
-  res.json({ message: "Order Cancalled!", data: returnedData.data })
+
+  res.json({ message: "Order Cancalled!", data: queueLoopbackResponse })
 });
 
 app.get("/orders", authMiddleware, async (req, res) => {
   const userId = req.userId;
-  const identifier = Math.random()
+  if (!userId) return
 
-  await client.lPush("incoming-queue", JSON.stringify({
-    type: "get_all_orders",
-    payload: { userId },
-    identifier,
-    responseQueue: "response-queue-" + QUEUE_ID
-  }))
+  const queueLoopbackResponse = await loopback({
+    messageType: "get_all_orders", userId
+  })
 
-  const returnedData = await pendingQueues(identifier);
-  if (!returnedData.ok) {
-    res.status(400).json({ message: returnedData.error })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Loopback failed" });
     return;
   }
-  res.json({ message: "All your orders!", data: returnedData.data })
+
+  res.json({ message: "All your orders!", data: queueLoopbackResponse })
 });
 
 app.get("/orders/:orderId", authMiddleware, async (req, res) => {
   const userId = req.userId;
+  if (!userId) return;
   const orderId = req.params.orderId
-  const identifier = Math.random()
 
-  await client.lPush("incoming-queue", JSON.stringify({
-    type: "get_order",
-    payload: { userId, orderId },
-    identifier,
-    responseQueue: "response-queue-" + QUEUE_ID
-  }))
+  const queueLoopbackResponse = await loopback({
+    messageType: "get_order", userId, orderId: String(orderId)
+  })
 
-  const returnedData = await pendingQueues(identifier);
-  if (!returnedData.ok) {
-    res.status(400).json({ message: returnedData.error })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Loopback failed" });
     return;
   }
-  res.json({ message: "Here is your order details!", data: returnedData.data })
+
+  res.json({ message: "Here is your order details!", data: queueLoopbackResponse })
 });
 
 app.get("/orderbook/:symbol", authMiddleware, async (req, res) => {
   const symbol = req.params.symbol
-  const identifier = Math.random()
 
-  await client.lPush("incoming-queue", JSON.stringify({
-    type: "get_depth",
-    payload: { symbol },
-    identifier,
-    responseQueue: "response-queue-" + QUEUE_ID
-  }))
+  const queueLoopbackResponse = await loopback({
+    messageType: "get_depth", symbol: String(symbol)
+  })
 
-  const returnedData = await pendingQueues(identifier);
-  if (!returnedData.ok) {
-    res.status(400).json({ message: returnedData.error })
-    return;
-  }
-  res.json({ message: `${symbol} details`, data: returnedData.data })
+  res.json({ message: `${symbol} details`, data: queueLoopbackResponse })
 });
 
 app.get("/fills/:symbol", authMiddleware, async (req, res) => {
   const symbol = req.params.symbol
-  const identifier = Math.random()
 
-  await client.lPush("incoming-queue", JSON.stringify({
-    type: "get_fills",
-    payload: { symbol },
-    identifier,
-    responseQueue: "response-queue-" + QUEUE_ID
-  }))
+  const queueLoopbackResponse = await loopback({
+    messageType: "get_fills", symbol: String(symbol)
+  })
 
-  const returnedData = await pendingQueues(identifier);
-  if (!returnedData.ok) {
-    res.status(400).json({ message: returnedData.error })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Loopback failed" });
     return;
   }
-  res.json({ message: `${symbol} fills`, data: returnedData.data })
+  res.json({ message: `${symbol} fills`, data: queueLoopbackResponse })
 });
 
 app.get("/stocks", (req, res) => {
@@ -232,21 +207,18 @@ app.get("/stocks", (req, res) => {
 
 app.get("/balance", authMiddleware, async (req, res) => {
   const userId = req.userId;
-  const identifier = Math.random()
+  if (!userId) return;
 
-  await client.lPush("incoming-queue", JSON.stringify({
-    type: "get_user_balance",
-    payload: { userId },
-    identifier,
-    responseQueue: "response-queue-" + QUEUE_ID
-  }))
+  const queueLoopbackResponse = await loopback({
+    messageType: "get_user_balance", userId
+  })
 
-  const returnedData = await pendingQueues(identifier);
-  if (!returnedData.ok) {
-    res.status(400).json({ message: returnedData.error })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Loopback failed" });
     return;
   }
-  res.json({ message: "Here is your balance", data: returnedData.data })
+
+  res.json({ message: "Here is your balance", data: queueLoopbackResponse })
 });
 
 app.listen(3000, () => console.log("CEX running on :3000"));
