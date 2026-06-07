@@ -200,6 +200,22 @@ app.get("/fills/:symbol", authMiddleware, async (req, res) => {
   res.json({ message: `${symbol} fills`, data: queueLoopbackResponse })
 });
 
+app.post("/perpOrder", authMiddleware, async (req, res) => {
+  const userId = req.userId
+  if (!userId) return;
+  const { symbol, perpSide, qty, margin, price, leverage } = req.body
+
+  const queueLoopbackResponse = await loopback({
+    messageType: "create_perporder", userId, symbol, perpSide, qty, margin, price, leverage
+  })
+  if (!queueLoopbackResponse) {
+    res.status(401).json({ message: "Loopback failed" })
+    return;
+  }
+
+  res.json({ message: "Order Placed!", data: queueLoopbackResponse })
+})
+
 app.get("equity/available", authMiddleware, async (req, res) => {
   const userId = req.userId
   if (!userId) return;
