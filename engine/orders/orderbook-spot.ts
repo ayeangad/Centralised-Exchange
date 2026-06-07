@@ -4,11 +4,16 @@ import { publishDepth } from '../orders/wspublish.ts'
 
 
 export function getBalance(userId: string, symbol: string) {
-  if (!BALANCES[userId]) BALANCES[userId] = {};
-  if (!BALANCES[userId][symbol]) {
-    BALANCES[userId][symbol] = { available: 10000, locked: 0 };
+  let userWallet = BALANCES.get(userId)
+  if (!userWallet) {
+    userWallet = {}
+    BALANCES.set(userId, userWallet)
   }
-  return BALANCES[userId][symbol];
+
+  if (!userWallet[symbol]) {
+    userWallet[symbol]
+  }
+  return userWallet[symbol] as Balance
 }
 
 export function getOrderbook(symbol: string) {
@@ -18,7 +23,7 @@ export function getOrderbook(symbol: string) {
   return ORDERBOOK[symbol];
 }
 
-export function settleTrade(buyerId: string, sellerId: string, qty: number, price: number, symbol: string): void {
+function settleTrade(buyerId: string, sellerId: string, qty: number, price: number, symbol: string): void {
   const totalCost = qty * price;
   getBalance(buyerId, "INR").locked -= totalCost
   getBalance(sellerId, "INR").available += totalCost
@@ -182,7 +187,7 @@ export function getDepth(symbol: string): DepthResponse {
 }
 
 export function getUserBalance(userId: string): Record<string, Balance> {
-  return BALANCES[userId] || {};
+  return BALANCES.get(userId) || {};
 }
 
 export function cancelOrder(input: CancelOrder) {
