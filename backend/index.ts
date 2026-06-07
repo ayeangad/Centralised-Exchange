@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken"
 import express from "express"
-import brycpt from "bcrypt"
+import bcrypt from "bcrypt"
 import { authMiddleware } from "./auth/middleware.ts"
 import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "../generated/prisma"
@@ -37,7 +37,7 @@ app.post("/signup", async (req, res) => {
     return;
   }
 
-  const hashPassword = await brycpt.hash(password, 10)
+  const hashPassword = await bcrypt.hash(password, 10)
   const newUser = await prisma.user.create({
     data: {
       username: username,
@@ -46,8 +46,7 @@ app.post("/signup", async (req, res) => {
   })
 
   const newUserId = newUser.id
-
-  BALANCES[newUserId] = {
+  BALANCES.set(newUserId, {
     "INR": { available: 0, locked: 0 }
   };
 
@@ -65,7 +64,7 @@ app.post("/login", async (req, res) => {
     return;
   }
 
-  const correctPassword = await brycpt.compare(password, userExists.password)
+  const correctPassword = await bcrypt.compare(password, userExists.password)
 
   if (!correctPassword) {
     res.status(403).json({
@@ -83,7 +82,7 @@ app.post("/login", async (req, res) => {
   })
 });
 
-app.post("/order", authMiddleware, async (req, res) => {
+app.post("/spot/order", authMiddleware, async (req, res) => {
   const userId = req.userId;
   if (!userId) return;
   const { side, type, symbol, price, qty } = req.body;
@@ -125,7 +124,7 @@ app.post("/admin/market", async (req, res) => {
   res.json({ message: "Market created!", id: response.id });
 });
 
-app.delete("/order/:orderId", authMiddleware, async (req, res) => {
+app.delete("/spot/order/:orderId", authMiddleware, async (req, res) => {
   const userId = req.userId;
   if (!userId) return
   const orderId = req.params.orderId
@@ -200,13 +199,13 @@ app.get("/fills/:symbol", authMiddleware, async (req, res) => {
   res.json({ message: `${symbol} fills`, data: queueLoopbackResponse })
 });
 
-app.post("/perpOrder", authMiddleware, async (req, res) => {
+app.post("/perps/order", authMiddleware, async (req, res) => {
   const userId = req.userId
   if (!userId) return;
-  const { symbol, perpSide, qty, margin, price, leverage } = req.body
+  const { symbol, side, type, intent, qty, margin, price, leverage } = req.body
 
   const queueLoopbackResponse = await loopback({
-    messageType: "create_perporder", userId, symbol, perpSide, qty, margin, price, leverage
+    messageType: "create_perporder", userId, symbol, side, type, intent, qty, margin, price, leverage
   })
   if (!queueLoopbackResponse) {
     res.status(401).json({ message: "Loopback failed" })
