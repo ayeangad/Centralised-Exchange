@@ -1,6 +1,7 @@
 export type Side = "buy" | "sell"
 export type OrderType = "market" | "limit"
-export type PerpType = "long" | "short"
+export type Intent = "OPEN" | "CLOSE"
+export type PositionSide = "long" | "short"
 export type OrderStatus = "open" | "partial" | "filled" | "cancelled"
 
 export type ToEngine =
@@ -14,6 +15,7 @@ export type ToEngine =
   | { messageType: "create_market"; marketId: number }
   | { messageType: "onramp"; userId: string, amount: string; }
   | { messageType: "available_equity"; userId: string; }
+  | { messageType: "create_perporder"; userId: string; symbol: string; side: Side; type: OrderType; intent: Intent; qty: number; margin: number; price: number; leverage: number; }
 
 export type EngineRequest = ToEngine & {
   loopbackId: string;
@@ -26,11 +28,11 @@ export interface EngineResponse {
   error?: string;
 }
 
-export type OpenOrder = {
+export interface OpenOrder {
   userId: string,
   originalOrderId: string,
-  qty: string,
-  filledQty: string
+  qty: number,
+  filledQty: number
 }
 
 export interface RedisStreamResponse {
@@ -46,8 +48,7 @@ export interface RedisStreamResponse {
 
 export interface PerpOrder {
   orderId: string;
-  market: string;
-  perpType: PerpType;
+  symbol: string;
   qty: string;
   margin: number;
   type: OrderType;
@@ -55,12 +56,15 @@ export interface PerpOrder {
   status: OrderStatus;
 }
 
-export interface Position {
-  market: string;
-  type: OrderType;
-  margin: number;
+export interface Positions {
+  userId: string;
+  symbol: string;
+  side: PositionSide;
+  size: number;
+  marginLocked: number;
   liquidationPrice: number;
-  averagePrce: number;
+  averagePrice: number;
+  realizedPnl: number;
 }
 
 export interface Collateral {
@@ -79,7 +83,8 @@ export interface RestingOrder {
   filledQty: number;
   status: OrderStatus;
   createdAt: number;
-  openOrders: OpenOrder[]
+  openOrders: OpenOrder;
+  intent?: Intent;
 }
 
 export interface Balance {
@@ -99,6 +104,7 @@ export interface OrderRecord {
   status: OrderStatus;
   fills: Fill[];
   createdAt: number;
+  intent?: Intent
 }
 
 export interface DepthLevel {
@@ -114,13 +120,13 @@ export interface Fill {
   buyOrderId: string;
   sellOrderId: string;
   createdAt: number;
+  makerIntent?: Intent;
+  takerIntent?: Intent;
 }
 
 export interface OrderBook {
   bids: RestingOrder[];
   asks: RestingOrder[];
-  marketId: string;
-  lastTradedPrice: number;
 }
 
 export interface DepthResponse {
@@ -130,8 +136,9 @@ export interface DepthResponse {
 }
 
 export const STOCKS = ["BTC", "SOL", "ETH", "USDC"]
-export const BALANCES: Record<string, Record<string, Balance>> = {};
+export const BALANCES = new Map<string, Record<string, Balance>>()
 export const ORDERBOOK: Record<string, OrderBook> = {};
 export const ORDERS = new Map<string, OrderRecord>();
+export const POSITIONS = new Map<string, Positions>();
 export const FILLS: Fill[] = [];
 
