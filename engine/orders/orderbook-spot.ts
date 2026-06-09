@@ -190,7 +190,7 @@ export function getUserBalance(userId: string): Record<string, Balance> {
   return BALANCES.get(userId) || {};
 }
 
-export function cancelOrder(input: CancelOrder) {
+export function cancelOrder(input: Extract<ToEngine, { messageType: "cancel_order" }>) {
   const { orderId, userId } = input
   const order = ORDERS.get(orderId)
   if (!order) throw new Error("Order not found")
