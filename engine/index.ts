@@ -1,7 +1,8 @@
 import { createClient } from "redis";
-import type { CreateOrder, EngineRequest, EngineResponse } from "./types/types";
-import type { CancelOrder, DepthLevel, Balance } from "./types/types";
-import { createOrder, getDepth, cancelOrder, getOrder, getUserBalance, getAllOrders, getFills } from "./orders/matching";
+import type { EngineRequest, EngineResponse } from "./types/types";
+import type { DepthLevel, Balance } from "./types/types";
+import { createOrder, getDepth, cancelOrder, getOrder, getUserBalance, getAllOrders, getFills } from "./orders/orderbook-spot.ts";
+import { createPerpOrder, getAvailableEquity } from "./orders/orderbook-perp";
 
 const client = await createClient({
   url: process.env.REDIS_URL
@@ -28,59 +29,69 @@ export async function startEngine() {
       let responseData: unknown = undefined;
       let errorMessage: string | undefined = undefined;
       try {
-        switch (request.type) {
+        switch (request.messageType) {
           case "create_order":
-            const orderData = request.payload as unknown as CreateOrder;
+            const orderData = request;
             responseData = createOrder(orderData);
             break;
 
           case "cancel_order":
-            const cancalData = request.payload as unknown as CancelOrder;
+            const cancalData = request;
             responseData = cancelOrder(cancalData);
             break;
 
           case "get_depth":
-            const symbol = request.payload.symbol as string
+            const symbol = request.symbol as string
             responseData = getDepth(symbol);
             break;
 
           case "get_user_balance":
-            const userId = request.payload.userId as string;
+            const userId = request.userId as string;
             responseData = getUserBalance(userId)
             break;
 
           case "get_order":
-            const orderId = request.payload.orderId as string;
+            const orderId = request.orderId as string;
             responseData = getOrder(orderId)
             break;
 
           case "get_all_orders":
-            const allOrdersUserId = request.payload.userId as string;
+            const allOrdersUserId = request.userId as string;
             responseData = getAllOrders(allOrdersUserId)
             break;
 
           case "get_fills":
-            const fillSymbol = request.payload.symbol as string;
+            const fillSymbol = request.symbol as string;
             responseData = getFills(fillSymbol)
             break;
 
+          case "create_perporder":
+            const perpOrder = request;
+            responseData = createPerpOrder(perpOrder)
+            break;
+
+          case "available_equity":
+            const equityAvailable = request
+            responseData = getAvailableEquity(equityAvailable)
+            break;
+
           default:
-            throw new Error(`Unknown command type: ${request.type}`);
+            throw new Error(`Unknown command type: ${request}`);
         }
       } catch (err: any) {
         errorMessage = err.message || "Internal engine error"
       }
       const engineResponse: EngineResponse = {
-        identifier: request.identifier,
+        loopbackId: request.loopbackId,
         ok: !errorMessage,
         data: responseData,
         error: errorMessage
       };
       console.log("ENGINE RESPONSE:", JSON.stringify(engineResponse))
 
-      if (request.responseQueue) {
+      if (request.loopbackId) {
         await publisherClient.lPush(
-          request.responseQueue,
+          request.loopbackId,
           JSON.stringify(engineResponse)
         );
       }
