@@ -1,32 +1,95 @@
 import { type PositionSide, POSITIONS, ORDERS, type Fill, BALANCES, type Positions, type OpenOrder, type ToEngine, type RestingOrder, type OrderRecord, FILLS, type Side, type Intent } from "../types/types";
 import { getBalance, getOrderbook } from "./orderbook-spot";
 
-function settleTrade(makerId: string, side: PositionSide, size: number, marginLocked: number, symbol: string, makerIntent: Intent, price: number, fillAmount: number, takerId: string, takerSide: PositionSide, takerIntent: Intent): void {
-  const makerPosition = POSITIONS.get(makerId)
-  const totalPrice = fillAmount * price
-  let liquidationPrice
-
-  if (side === "long") {
-    liquidationPrice = totalPrice - marginLocked
-  } else if (side === "short") {
-    liquidationPrice = totalPrice + marginLocked
-  }
-
-  if (liquidationPrice === undefined) throw new Error("Liquidation Price undefined")
-
-  if (!makerPosition) {
-    POSITIONS.set(makerId, {
-      userId: makerId,
-      symbol: symbol,
-      side: side,
-      size: fillAmount,
-      marginLocked: marginLocked,
-      liquidationPrice: liquidationPrice,
-      averagePrice: price,
-      realizedPnl: 0
-    })
+function getPositionSide(side: Side): PositionSide {
+  if (side === "buy") {
+    return "long"
+  } else if (side === "sell") {
+    return "short"
+  } else {
+    throw new Error("Side Undefined")
   }
 }
+
+function updatePositionState(userId: string, symbol: string, tradeSide: Side, intent: Intent, matchPrice: number, matchQty: number, marginLockedinTrade: number): void {
+  const currentPosition = POSITIONS.get(userId)
+  let liquidationPrice
+  if (tradeSide === "buy") {
+    liquidationPrice = matchPrice - marginLockedinTrade
+  } else if (tradeSide === "sell") {
+    liquidationPrice = matchPrice + marginLockedinTrade
+  } else {
+    throw new Error("Liquidation Error!")
+  }
+
+  if (intent === "OPEN") {
+    if (!currentPosition || currentPosition === undefined) {
+      POSITIONS.set(userId, {
+        userId: userId,
+        symbol: symbol,
+        side: getPositionSide(tradeSide),
+        size: matchQty,
+        marginLocked: marginLockedinTrade,
+        liquidationPrice: liquidationPrice,
+        averagePrice: matchPrice,
+        realizedPnl: 0
+      })
+    } else if (currentPosition.side === getPositionSide(tradeSide)) {
+      const newQty = matchQty + currentPosition.size
+      const newMargin = currentPosition.marginLocked + marginLockedinTrade
+      const existingPos = currentPosition.size * currentPosition.averagePrice
+      const newFill = matchPrice * matchQty
+      const totalNotional = existingPos + newFill
+      const newAveragePrice = totalNotional / newQty
+
+      let newLiquidationPrice
+      if (getPositionSide(tradeSide) === "long") {
+        newLiquidationPrice = totalNotional - newMargin
+      } else if (getPositionSide(tradeSide) === "short") {
+        newLiquidationPrice = totalNotional + newMargin
+      } else {
+        throw new Error("Position Side Liquidation Price Undefined")
+      }
+
+      POSITIONS.set(userId, {
+        userId: userId,
+        symbol: symbol,
+        side: getPositionSide(tradeSide),
+        size: newQty,
+        marginLocked: newMargin,
+        liquidationPrice: newLiquidationPrice,
+        averagePrice: newAveragePrice,
+        realizedPnl: currentPosition.realizedPnl
+      })
+    } else if (currentPosition.side != getPositionSide(tradeSide)) {
+      throw new Error("Close your previous position first!")
+    }
+  } else if (intent === "CLOSE") {
+    if (!currentPosition) {
+      throw new Error("No Current Position to close!")
+    } else {
+      let realizedPnl;
+      if (currentPosition.side === "long") {
+        realizedPnl = (matchPrice - currentPosition.averagePrice) * matchQty
+      } else if (currentPosition.side === "short") {
+        realizedPnl = (currentPosition.averagePrice - matchPrice) * matchQty
+      } else {
+        throw new Error("RealizedPnl undefined")
+      }
+
+      currentPosition.size -= matchQty
+      getBalance(userId, "INR").locked -= marginLockedinTrade
+      currentPosition.realizedPnl += realizedPnl
+
+      if (currentPosition.size === 0) {
+        POSITIONS.delete(userId)
+      }
+
+    }
+  }
+}
+
+
 
 export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_perporder" }>) {
   const { userId, symbol, side, type, intent, qty, margin, price, leverage } = input
@@ -34,6 +97,22 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
   const reqMargin = totalCost / leverage
   const positionSize = margin * leverage
   const availableEquity = getAvailableEquity({ messageType: "available_equity", userId: userId })
+
+  if (intent === "CLOSE") {
+    const currentPosition = POSITIONS.get(userId)
+    const targetPositionSide = getPositionSide(side)
+
+    if (!currentPosition) {
+      throw new Error("Position Doesnt Exist!")
+    }
+    if (currentPosition.side === targetPositionSide) {
+      throw new Error("Cant close a position by adding a new position")
+    }
+    if (qty > currentPosition.size) {
+      throw new Error("Close quantity exceeds current position size")
+    }
+  }
+
   if (reqMargin > availableEquity) {
     throw new Error("Not enough margin!")
   }
@@ -53,6 +132,7 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
     price: price || null,
     fills: [],
     createdAt: Date.now(),
+    leverage,
     qty,
     filledQty: 0,
     status: "open",
@@ -80,6 +160,7 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
         symbol: existingOrder.symbol,
         price: existingOrder.price,
         qty: fillAmount,
+        leverage: existingOrder.leverage,
         buyOrderId: side === "buy" ? order.orderId : existingOrder.orderId,
         sellOrderId: side === "sell" ? order.orderId : existingOrder.orderId,
         createdAt: Date.now(),
@@ -99,8 +180,11 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
         throw new Error("Perp match without an intent!")
       }
 
-      settleTrade()
+      const makerMarginLocked = (fillAmount * existingOrder.price) / existingOrder.leverage
+      updatePositionState(existingOrder.userId, symbol, existingOrder.side, existingOrder.intent, existingOrder.price, fillAmount, makerMarginLocked)
 
+      const takerMarginLocked = (fillAmount * price) / leverage
+      updatePositionState(userId, symbol, side, intent, price, fillAmount, takerMarginLocked)
     }
   }
 

@@ -80,6 +80,7 @@ export interface RestingOrder {
   symbol: string;
   price: number;
   qty: number;
+  leverage: number;
   filledQty: number;
   status: OrderStatus;
   createdAt: number;
@@ -100,6 +101,7 @@ export interface OrderRecord {
   symbol: string;
   price: number | null;
   qty: number;
+  leverage: number;
   filledQty: number;
   status: OrderStatus;
   fills: Fill[];
@@ -117,6 +119,7 @@ export interface Fill {
   symbol: string;
   price: number;
   qty: number;
+  leverage: number;
   buyOrderId: string;
   sellOrderId: string;
   createdAt: number;
