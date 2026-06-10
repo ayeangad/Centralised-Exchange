@@ -1,5 +1,38 @@
-import { type PositionSide, POSITIONS, ORDERS, type Fill, BALANCES, type Positions, type OpenOrder, type ToEngine, type RestingOrder, type OrderRecord, FILLS, type Side, type Intent } from "../types/types";
+import { type PositionSide, POSITIONS, ORDERS, type Fill, BALANCES, type Positions, type OpenOrder, type ToEngine, type RestingOrder, type OrderRecord, FILLS, type Side, type Intent, STOCKS } from "../types/types";
 import { getBalance, getOrderbook } from "./orderbook-spot";
+
+
+function payFundingRate(symbol: string, spotPrice: number): void {
+  const bestBid = getOrderbook(symbol).bids.sort((a, b) => b.price - a.price)
+  const bestAsk = getOrderbook(symbol).asks.sort((a, b) => a.price - b.price)
+
+  if (bestAsk[0] === undefined || bestBid[0] === undefined) {
+    throw new Error("Couldnt find the best bid or best ask ")
+  }
+
+  const perpPrice = (bestBid[0].price + bestAsk[0].price) / 2
+  const fundingRate = (perpPrice - spotPrice) / spotPrice
+
+  for (const [userId, position] of POSITIONS) {
+    if (position.symbol === symbol) {
+      const fundingPayment = position.size * position.averagePrice * fundingRate
+      if (position.side === "long") {
+        getBalance(userId, "INR").available -= fundingPayment
+      } else if (position.side === "short") {
+        getBalance(userId, "INR").available += fundingPayment
+      }
+    }
+  }
+}
+
+
+// get spotPrice from binance
+setInterval(() => {
+  for (const symbol of STOCKS) {
+    payFundingRate(symbol, 10000) // spotPrice
+  }
+}, 8 * 60 * 60 * 1000)
+
 
 function getPositionSide(side: Side): PositionSide {
   if (side === "buy") {
@@ -10,6 +43,7 @@ function getPositionSide(side: Side): PositionSide {
     throw new Error("Side Undefined")
   }
 }
+
 
 function updatePositionState(userId: string, symbol: string, tradeSide: Side, intent: Intent, matchPrice: number, matchQty: number, marginLockedinTrade: number): void {
   const currentPosition = POSITIONS.get(userId)
@@ -88,8 +122,6 @@ function updatePositionState(userId: string, symbol: string, tradeSide: Side, in
     }
   }
 }
-
-
 
 export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_perporder" }>) {
   const { userId, symbol, side, type, intent, qty, margin, price, leverage } = input
@@ -180,7 +212,9 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
         throw new Error("Perp match without an intent!")
       }
 
-      const makerMarginLocked = (fillAmount * existingOrder.price) / existingOrder.leverage
+
+
+      const makerMarginLocked = (fillAmount * existingOrder.price) / existingOrder?.leverage
       updatePositionState(existingOrder.userId, symbol, existingOrder.side, existingOrder.intent, existingOrder.price, fillAmount, makerMarginLocked)
 
       const takerMarginLocked = (fillAmount * price) / leverage
