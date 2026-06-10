@@ -111,12 +111,35 @@ function updatePositionState(userId: string, symbol: string, tradeSide: Side, in
         throw new Error("RealizedPnl undefined")
       }
 
-      currentPosition.size -= matchQty
+      const newQty = currentPosition.size - matchQty
+      const newMargin = currentPosition.marginLocked - marginLockedinTrade
+      const totalNotional = newQty * currentPosition.averagePrice
+
+      let newLiquidationPrice
+      if (getPositionSide(tradeSide) === "long") {
+        newLiquidationPrice = totalNotional - newMargin
+      } else if (getPositionSide(tradeSide) === "short") {
+        newLiquidationPrice = totalNotional + newMargin
+      } else {
+        throw new Error("Position Side Liquidation Price Undefined")
+      }
+
       getBalance(userId, "INR").locked -= marginLockedinTrade
       currentPosition.realizedPnl += realizedPnl
 
       if (currentPosition.size === 0) {
         POSITIONS.delete(userId)
+      } else {
+        POSITIONS.set(userId, {
+          userId: userId,
+          symbol: symbol,
+          side: getPositionSide(tradeSide),
+          size: newQty,
+          marginLocked: newMargin,
+          liquidationPrice: newLiquidationPrice,
+          averagePrice: currentPosition.averagePrice,
+          realizedPnl: currentPosition.realizedPnl
+        })
       }
 
     }
