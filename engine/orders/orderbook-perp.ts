@@ -1,4 +1,4 @@
-import { type PositionSide, POSITIONS, ORDERS, type Fill, BALANCES, type Positions, type OpenOrder, type ToEngine, type RestingOrder, type OrderRecord, FILLS, type Side, type Intent, STOCKS } from "../types/types";
+import { INSURANCE_FUND, type PositionSide, POSITIONS, ORDERS, type Fill, BALANCES, type Positions, type OpenOrder, type ToEngine, type RestingOrder, type OrderRecord, FILLS, type Side, type Intent, STOCKS } from "../types/types";
 import { getBalance, getOrderbook } from "./orderbook-spot";
 
 
@@ -123,11 +123,36 @@ function updatePositionState(userId: string, symbol: string, tradeSide: Side, in
   }
 }
 
+function liquidatePosition(symbol: string, currentPrice: number): void {
+  for (const [userId, position] of POSITIONS) {
+    if (position.symbol === symbol) {
+      if (position.side === "long") {
+        if (currentPrice >= position.liquidationPrice) {
+          getBalance(userId, "INR").locked -= position.marginLocked
+          INSURANCE_FUND.balance += position.marginLocked
+          POSITIONS.delete(userId)
+        }
+      } else if (position.side === "short") {
+        if (currentPrice <= position.liquidationPrice) {
+          getBalance(userId, "INR").locked -= position.marginLocked
+          INSURANCE_FUND.balance += position.marginLocked
+          POSITIONS.delete(userId)
+        }
+      }
+    }
+  }
+}
+
+setInterval(() => {
+  for (const symbol of STOCKS) {
+    liquidatePosition(symbol, 50000) // calc current price with api
+  }
+}, 10000)
+
 export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_perporder" }>) {
   const { userId, symbol, side, type, intent, qty, margin, price, leverage } = input
   const totalCost = qty * price
   const reqMargin = totalCost / leverage
-  const positionSize = margin * leverage
   const availableEquity = getAvailableEquity({ messageType: "available_equity", userId: userId })
 
   if (intent === "CLOSE") {
@@ -147,6 +172,9 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
 
   if (reqMargin > availableEquity) {
     throw new Error("Not enough margin!")
+  }
+  if (margin < reqMargin) {
+    throw new Error("Not enough required margin")
   }
 
   if (side === "buy" || side === "sell") {
