@@ -16,10 +16,26 @@ function payFundingRate(symbol: string, spotPrice: number): void {
   for (const [userId, position] of POSITIONS) {
     if (position.symbol === symbol) {
       const fundingPayment = position.size * position.averagePrice * fundingRate
-      if (position.side === "long") {
-        getBalance(userId, "INR").available -= fundingPayment
-      } else if (position.side === "short") {
-        getBalance(userId, "INR").available += fundingPayment
+      if (fundingRate > 0) {
+        if (position.side === "long") {
+          if (getBalance(userId, "INR").available < fundingPayment) {
+            liquidatePosition(symbol, perpPrice)
+          } else {
+            getBalance(userId, "INR").available -= fundingPayment
+          }
+        } else if (position.side === "short") {
+          getBalance(userId, "INR").available += fundingPayment
+        }
+      } else if (fundingRate < 0) {
+        if (position.side === "short") {
+          if (getBalance(userId, "INR").available < Math.abs(fundingPayment)) {
+            liquidatePosition(symbol, perpPrice)
+          } else {
+            getBalance(userId, "INR").available -= Math.abs(fundingPayment)
+          }
+        } else if (position.side === "long") {
+          getBalance(userId, "INR").available += Math.abs(fundingPayment)
+        }
       }
     }
   }
