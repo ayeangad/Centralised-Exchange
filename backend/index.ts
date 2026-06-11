@@ -39,18 +39,12 @@ app.post("/signup", async (req, res) => {
   }
 
   const hashPassword = await bcrypt.hash(password, 10)
-  const newUser = await prisma.user.create({
+  await prisma.user.create({
     data: {
       username: username,
       password: hashPassword
     }
   })
-
-  const newUserId = newUser.id
-  BALANCES.set(newUserId, {
-    "INR": { available: 0, locked: 0 }
-  };
-
   res.json({ message: "Signed Up!" })
 });
 
@@ -156,7 +150,7 @@ app.get("/orders", authMiddleware, async (req, res) => {
     return;
   }
 
-  res.json({ message: "All your orders!", data: queueLoopbackResponse })
+  res.json({ message: "All your orders!", data: queueLoopbackResponse.data })
 });
 
 app.get("/orders/:orderId", authMiddleware, async (req, res) => {
@@ -231,7 +225,7 @@ app.post("/perps/cancel-order", authMiddleware, async (req, res) => {
   res.json({ message: "Order Cancelled", data: queueLoopbackResponse })
 })
 
-app.get("equity/available", authMiddleware, async (req, res) => {
+app.get("/equity/available", authMiddleware, async (req, res) => {
   const userId = req.userId
   if (!userId) return;
 
@@ -246,7 +240,7 @@ app.get("equity/available", authMiddleware, async (req, res) => {
   res.json({ message: "Here is your available equity!", data: queueLoopbackResponse })
 })
 
-app.get("perps/orders", authMiddleware, async (req, res) => {
+app.get("/perps/orders", authMiddleware, async (req, res) => {
   const userId = req.userId
   if (!userId) return
 
@@ -262,11 +256,12 @@ app.get("perps/orders", authMiddleware, async (req, res) => {
 
 })
 
-app.get("onramp", authMiddleware, async (req, res) => {
+app.post("/onramp", authMiddleware, async (req, res) => {
   const userId = req.userId
   if (!userId) return;
   const { amount } = req.body
 
+  console.log("hello")
   const queueLoopbackResponse = await loopback({
     messageType: "onramp", userId, amount
   })
@@ -279,7 +274,7 @@ app.get("onramp", authMiddleware, async (req, res) => {
 })
 
 
-app.get("perps/position", authMiddleware, async (req, res) => {
+app.get("/perps/position", authMiddleware, async (req, res) => {
   const userId = req.userId
   if (!userId) return;
 
