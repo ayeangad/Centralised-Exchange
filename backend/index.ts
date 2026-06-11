@@ -88,7 +88,7 @@ app.post("/spot/order", authMiddleware, async (req, res) => {
     res.status(403).json({ message: "Loopback failed" });
     return;
   }
-  res.json({ message: "Order Placed!", data: queueLoopbackResponse })
+  res.json({ message: "Order Placed!", data: queueLoopbackResponse.data })
 });
 
 app.post("/admin/market", async (req, res) => {
@@ -134,7 +134,7 @@ app.delete("/spot/order/:orderId", authMiddleware, async (req, res) => {
     return;
   }
 
-  res.json({ message: "Order Cancalled!", data: queueLoopbackResponse })
+  res.json({ message: "Order Cancalled!", data: queueLoopbackResponse.data })
 });
 
 app.get("/orders", authMiddleware, async (req, res) => {
@@ -167,7 +167,7 @@ app.get("/orders/:orderId", authMiddleware, async (req, res) => {
     return;
   }
 
-  res.json({ message: "Here is your order details!", data: queueLoopbackResponse })
+  res.json({ message: "Here is your order details!", data: queueLoopbackResponse.data })
 });
 
 app.get("/orderbook/:symbol", authMiddleware, async (req, res) => {
@@ -177,7 +177,7 @@ app.get("/orderbook/:symbol", authMiddleware, async (req, res) => {
     messageType: "get_depth", symbol: String(symbol)
   })
 
-  res.json({ message: `${symbol} details`, data: queueLoopbackResponse })
+  res.json({ message: `${symbol} details`, data: queueLoopbackResponse.data })
 });
 
 app.get("/fills/:symbol", authMiddleware, async (req, res) => {
@@ -191,7 +191,7 @@ app.get("/fills/:symbol", authMiddleware, async (req, res) => {
     res.status(403).json({ message: "Loopback failed" });
     return;
   }
-  res.json({ message: `${symbol} fills`, data: queueLoopbackResponse })
+  res.json({ message: `${symbol} fills`, data: queueLoopbackResponse.data })
 });
 
 app.post("/perps/order", authMiddleware, async (req, res) => {
@@ -207,7 +207,7 @@ app.post("/perps/order", authMiddleware, async (req, res) => {
     return;
   }
 
-  res.json({ message: "Order Placed!", data: queueLoopbackResponse })
+  res.json({ message: "Order Placed!", data: queueLoopbackResponse.data })
 })
 
 app.post("/perps/cancel-order", authMiddleware, async (req, res) => {
@@ -222,14 +222,14 @@ app.post("/perps/cancel-order", authMiddleware, async (req, res) => {
     res.status(403).json({ message: "Couldn't cancel order" })
   }
 
-  res.json({ message: "Order Cancelled", data: queueLoopbackResponse })
+  res.json({ message: "Order Cancelled", data: queueLoopbackResponse.data })
 })
 
 app.get("/equity/available", authMiddleware, async (req, res) => {
   const userId = req.userId
   if (!userId) return;
 
-  const queueLoopbackResponse = loopback({
+  const queueLoopbackResponse = await loopback({
     messageType: "available_equity", userId
   })
   if (!queueLoopbackResponse) {
@@ -237,7 +237,7 @@ app.get("/equity/available", authMiddleware, async (req, res) => {
     return;
   }
 
-  res.json({ message: "Here is your available equity!", data: queueLoopbackResponse })
+  res.json({ message: "Here is your available equity!", data: queueLoopbackResponse.data })
 })
 
 app.get("/perps/orders", authMiddleware, async (req, res) => {
@@ -252,7 +252,7 @@ app.get("/perps/orders", authMiddleware, async (req, res) => {
     res.status(403).json({ message: "No order history!" })
   }
 
-  res.json({ message: "Your perp order history", data: queueLoopbackResponse })
+  res.json({ message: "Your perp order history", data: queueLoopbackResponse.data })
 
 })
 
@@ -269,7 +269,7 @@ app.post("/onramp", authMiddleware, async (req, res) => {
     res.status(403).json({ message: "Couldnt add!" })
   }
 
-  res.json({ message: "Your new balance", data: queueLoopbackResponse })
+  res.json({ message: "Your new balance", data: queueLoopbackResponse.data })
 
 })
 
@@ -285,7 +285,7 @@ app.get("/perps/position", authMiddleware, async (req, res) => {
     res.status(403).json({ message: "No perp positions" })
   }
 
-  res.json({ message: "Your perp positions", data: queueLoopbackResponse })
+  res.json({ message: "Your perp positions", data: queueLoopbackResponse.data })
 
 })
 
@@ -307,7 +307,7 @@ app.get("/balance", authMiddleware, async (req, res) => {
     return;
   }
 
-  res.json({ message: "Here is your balance", data: queueLoopbackResponse })
+  res.json({ message: "Here is your balance", data: queueLoopbackResponse.data })
 });
 
 app.listen(3000, () => console.log("CEX running on :3000"));
