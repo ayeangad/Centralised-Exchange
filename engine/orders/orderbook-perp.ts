@@ -1,5 +1,7 @@
-import { INSURANCE_FUND, type PositionSide, POSITIONS, ORDERS, type Fill, BALANCES, type Positions, type OpenOrder, type ToEngine, type RestingOrder, type OrderRecord, FILLS, type Side, type Intent, STOCKS, type Balance } from "../types/types";
+import { type OrderStatus, INSURANCE_FUND, type PositionSide, POSITIONS, ORDERS, type Fill, BALANCES, type Positions, type OpenOrder, type ToEngine, type RestingOrder, type OrderRecord, FILLS, type Side, type Intent, STOCKS, type Balance } from "../types/types";
 import { getBalance, getOrderbook } from "./orderbook-spot";
+import { publishDepth } from "./wspublish";
+
 
 
 function payFundingRate(symbol: string, spotPrice: number): void {
@@ -237,6 +239,7 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
     status: "open",
     intent
   }
+  ORDERS.set(orderId, order)
 
   const books = getOrderbook(symbol)
   const oppositeSide = side === "buy" ? books.asks : books.bids
@@ -280,13 +283,53 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
       }
 
       const makerMarginLocked = (fillAmount * existingOrder.price) / existingOrder?.leverage
-      updatePositionState(existingOrder.userId, symbol, existingOrder.side, existingOrder.intent, existingOrder.price, fillAmount, makerMarginLocked)
+      updatePositionState(String(existingOrder.userId), symbol, existingOrder.side, existingOrder.intent, existingOrder.price, fillAmount, makerMarginLocked)
 
       const takerMarginLocked = (fillAmount * price) / leverage
-      updatePositionState(userId, symbol, side, intent, price, fillAmount, takerMarginLocked)
+      updatePositionState(String(userId), symbol, side, intent, price, fillAmount, takerMarginLocked)
     }
   }
+
+  order.filledQty = qty - remainingQty
+  order.status = remainingQty === 0 ? "filled" : (remainingQty === qty ? "open" : "partial")
+  ORDERS.set(order.orderId, order);
+
+  if (remainingQty > 0) {
+    const mySide = side === "buy" ? books.bids : books.asks
+
+    mySide.push({
+      orderId: order.orderId,
+      userId,
+      price: price!,
+      side,
+      type: "limit",
+      symbol,
+      createdAt: Date.now(),
+      intent: intent,
+      qty: remainingQty,
+      filledQty: qty - remainingQty,
+      status: order.status as OrderStatus,
+      openOrders: {
+        userId: userId,
+        originalOrderId: orderId,
+        qty: qty,
+        filledQty: qty - remainingQty
+      }
+    });
+  }
+  publishDepth(symbol);
+
+  return {
+    message: "Order Processed!",
+    orderId: order.orderId,
+    status: order.status,
+    fills: order.fills,
+    averagePrice: price ?? 0,
+    filled: qty - remainingQty,
+    remaining: remainingQty
+  }
 }
+
 
 export function getAvailableEquity(input: Extract<ToEngine, { messageType: "available_equity" }>): number {
   const { userId } = input
@@ -314,6 +357,7 @@ export function getPerpOrders(input: Extract<ToEngine, { messageType: "get_perp_
 
 export function getPerpPositions(input: Extract<ToEngine, { messageType: "get_perp_positions" }>) {
   const { userId } = input
+  console.log(userId)
   const userPosition = POSITIONS.get(userId)
   if (!userPosition) {
     throw new Error("You have no position")
