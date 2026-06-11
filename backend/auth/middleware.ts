@@ -34,6 +34,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     console.error(error)
     res.status(403).json({ message: "Invalid or Expired token" })
   }
+
 }
 
 

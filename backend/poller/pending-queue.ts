@@ -1,5 +1,5 @@
 import { createClient } from "redis"
-import type { RedisStreamResponse, ToEngine } from "../../engine/types/types";
+import type { EngineResponse, RedisStreamResponse, ToEngine } from "../../engine/types/types";
 
 
 const client = await createClient({
@@ -25,10 +25,10 @@ try {
   }
 }
 
-const loopBackResolves = new Map<string, (value: unknown) => void>()
+const loopBackResolves = new Map<string, (value: EngineResponse) => void>()
 
 export function loopback(message: ToEngine) {
-  return new Promise(async (resolve, reject) => {
+  return new Promise<EngineResponse>(async (resolve, reject) => {
     const loopbackId = Math.random().toString();
     await client.xAdd("incoming-queue", "*", {
       data: JSON.stringify({ ...message, loopbackId })
@@ -57,10 +57,10 @@ async function main() {
     if (!raw) continue
 
     const parsed = JSON.parse(raw.message.data)
-    const loopbackId = parsed.loopbackId
+    const loopbackId = parsed.engineResponse.loopbackId
     if (!loopbackId) continue
 
-    loopBackResolves.get(loopbackId)?.(raw.message.data)
+    loopBackResolves.get(loopbackId)?.(parsed.engineResponse)
     loopBackResolves.delete(loopbackId)
   }
 }
