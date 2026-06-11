@@ -216,6 +216,21 @@ app.post("/perps/order", authMiddleware, async (req, res) => {
   res.json({ message: "Order Placed!", data: queueLoopbackResponse })
 })
 
+app.post("/perps/cancel-order", authMiddleware, async (req, res) => {
+  const userId = req.userId
+  if (!userId) return;
+  const { orderId } = req.body
+
+  const queueLoopbackResponse = await loopback({
+    messageType: "cancel_order", userId, orderId
+  })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Couldn't cancel order" })
+  }
+
+  res.json({ message: "Order Cancelled", data: queueLoopbackResponse })
+})
+
 app.get("equity/available", authMiddleware, async (req, res) => {
   const userId = req.userId
   if (!userId) return;
@@ -264,7 +279,7 @@ app.get("onramp", authMiddleware, async (req, res) => {
 })
 
 
-app.get("perps/positions", authMiddleware, async (req, res) => {
+app.get("perps/position", authMiddleware, async (req, res) => {
   const userId = req.userId
   if (!userId) return;
 

@@ -320,3 +320,35 @@ export function getPerpPositions(input: Extract<ToEngine, { messageType: "get_pe
   }
   return userPosition
 }
+
+export function cancelPerpOrder(input: Extract<ToEngine, { messageType: "cancel_perp_order" }>) {
+  const { userId, orderId } = input
+  const userOrder = ORDERS.get(orderId)
+
+  if (!userOrder) {
+    throw new Error("Order doesnt exist")
+  }
+  if (userOrder.userId != userId) {
+    throw new Error("You are not the owner of this order")
+  }
+  if (userOrder.qty === userOrder.filledQty) {
+    throw new Error("Order is filled")
+  }
+  const orderbook = getOrderbook(userOrder.symbol)
+  const side = userOrder.side === "buy" ? orderbook.bids : orderbook.asks
+  const index = side.findIndex(i => i.orderId === orderId)
+  if (index != -1) side.splice(index, 1)
+
+  if (!userOrder.price || userOrder.leverage === undefined) throw new Error("Price cant be null or leverage is undefined")
+
+  const remainingQty = userOrder.qty - userOrder.filledQty
+  const totalCost = remainingQty * userOrder.price
+  const marginLeft = totalCost / userOrder.leverage
+
+  getBalance(userId, "INR").locked -= marginLeft
+  getBalance(userId, "INR").available += marginLeft
+
+  userOrder.status = "cancelled"
+
+  return ("Cancelled")
+}

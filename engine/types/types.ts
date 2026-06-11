@@ -18,6 +18,7 @@ export type ToEngine =
   | { messageType: "create_perporder"; userId: string; symbol: string; side: Side; type: OrderType; intent: Intent; qty: number; margin: number; price: number; leverage: number; }
   | { messageType: "get_perp_orders"; userId: string }
   | { messageType: "get_perp_positions"; userId: string }
+  | { messageType: "cancel_perp_order"; userId: string; orderId: string }
 
 export type EngineRequest = ToEngine & {
   loopbackId: string;
