@@ -11,7 +11,11 @@ export function getBalance(userId: string, symbol: string) {
   }
 
   if (!userWallet[symbol]) {
-    userWallet[symbol]
+    userWallet[symbol] = {
+      available: 0,
+      locked: 0
+    }
+    BALANCES.set(userId, userWallet)
   }
   return userWallet[symbol] as Balance
 }
