@@ -294,3 +294,9 @@ export function getAvailableEquity(input: Extract<ToEngine, { messageType: "avai
   return userBal.available
 }
 
+export function onRamp(input: Extract<ToEngine, { messageType: "onramp" }>): number {
+  const { userId, amount } = input
+  const userBal = getBalance(userId, "INR")
+  userBal.available += amount
+  return userBal.available
+}
