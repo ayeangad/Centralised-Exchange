@@ -1,4 +1,4 @@
-import { INSURANCE_FUND, type PositionSide, POSITIONS, ORDERS, type Fill, BALANCES, type Positions, type OpenOrder, type ToEngine, type RestingOrder, type OrderRecord, FILLS, type Side, type Intent, STOCKS } from "../types/types";
+import { INSURANCE_FUND, type PositionSide, POSITIONS, ORDERS, type Fill, BALANCES, type Positions, type OpenOrder, type ToEngine, type RestingOrder, type OrderRecord, FILLS, type Side, type Intent, STOCKS, type Balance } from "../types/types";
 import { getBalance, getOrderbook } from "./orderbook-spot";
 
 
@@ -279,8 +279,6 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
         throw new Error("Perp match without an intent!")
       }
 
-
-
       const makerMarginLocked = (fillAmount * existingOrder.price) / existingOrder?.leverage
       updatePositionState(existingOrder.userId, symbol, existingOrder.side, existingOrder.intent, existingOrder.price, fillAmount, makerMarginLocked)
 
@@ -288,11 +286,11 @@ export function createPerpOrder(input: Extract<ToEngine, { messageType: "create_
       updatePositionState(userId, symbol, side, intent, price, fillAmount, takerMarginLocked)
     }
   }
-
 }
 
 export function getAvailableEquity(input: Extract<ToEngine, { messageType: "available_equity" }>): number {
   const { userId } = input
-  const availableEquity: number = 1200
-  return availableEquity
+  const userBal = getBalance(userId, "INR")
+  return userBal.available
 }
+
