@@ -2,7 +2,7 @@ import { createClient } from "redis";
 import type { EngineRequest, EngineResponse } from "./types/types";
 import type { DepthLevel, Balance } from "./types/types";
 import { createOrder, getDepth, cancelOrder, getOrder, getUserBalance, getAllOrders, getFills } from "./orders/orderbook-spot.ts";
-import { createPerpOrder, getAvailableEquity, getPerpOrders } from "./orders/orderbook-perp";
+import { createPerpOrder, getAvailableEquity, getPerpOrders, getPerpPositions, onRamp } from "./orders/orderbook-perp";
 
 const client = await createClient({
   url: process.env.REDIS_URL
@@ -78,6 +78,16 @@ export async function startEngine() {
           case "get_perp_orders":
             const perpOrders = request
             responseData = getPerpOrders(perpOrders)
+            break;
+
+          case "onramp":
+            const ramp = request
+            responseData = onRamp(ramp)
+            break;
+
+          case "get_perp_positions":
+            const positions = request
+            responseData = getPerpPositions(positions)
             break;
 
           default:

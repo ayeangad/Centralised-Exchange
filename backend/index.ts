@@ -247,6 +247,24 @@ app.get("perps/orders", authMiddleware, async (req, res) => {
 
 })
 
+app.get("onramp", authMiddleware, async (req, res) => {
+  const userId = req.userId
+  if (!userId) return;
+  const { amount } = req.body
+
+  const queueLoopbackResponse = await loopback({
+    messageType: "onramp", userId, amount
+  })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "Couldnt add!" })
+  }
+
+  res.json({ message: "Your new balance", data: queueLoopbackResponse })
+
+})
+
+
+
 app.get("/stocks", (req, res) => {
   res.json({ data: STOCKS });
 });
