@@ -311,3 +311,12 @@ export function getPerpOrders(input: Extract<ToEngine, { messageType: "get_perp_
   }
   return orders
 }
+
+export function getPerpPositions(input: Extract<ToEngine, { messageType: "get_perp_positions" }>) {
+  const { userId } = input
+  const userPosition = POSITIONS.get(userId)
+  if (!userPosition) {
+    throw new Error("You have no position")
+  }
+  return userPosition
+}

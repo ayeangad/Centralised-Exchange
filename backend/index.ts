@@ -264,6 +264,21 @@ app.get("onramp", authMiddleware, async (req, res) => {
 })
 
 
+app.get("perps/positions", authMiddleware, async (req, res) => {
+  const userId = req.userId
+  if (!userId) return;
+
+  const queueLoopbackResponse = await loopback({
+    messageType: "get_perp_positions", userId
+  })
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "No perp positions" })
+  }
+
+  res.json({ message: "Your perp positions", data: queueLoopbackResponse })
+
+})
+
 
 app.get("/stocks", (req, res) => {
   res.json({ data: STOCKS });
