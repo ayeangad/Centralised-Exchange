@@ -8,6 +8,7 @@ import { loopback } from "./poller/pending-queue.ts"
 import z from "zod"
 import { BALANCES, STOCKS } from "../engine/types/types.ts"
 import { env } from "./auth/env.ts"
+import { quotelessJson } from "zod/v3"
 
 
 const adapter = new PrismaPg({ connectionString: env.databaseUrl })
@@ -228,6 +229,22 @@ app.get("equity/available", authMiddleware, async (req, res) => {
   }
 
   res.json({ message: "Here is your available equity!", data: queueLoopbackResponse })
+})
+
+app.get("perps/orders", authMiddleware, async (req, res) => {
+  const userId = req.userId
+  if (!userId) return
+
+  const queueLoopbackResponse = await loopback({
+    messageType: "get_perp_orders", userId
+  })
+
+  if (!queueLoopbackResponse) {
+    res.status(403).json({ message: "No order history!" })
+  }
+
+  res.json({ message: "Your perp order history", data: queueLoopbackResponse })
+
 })
 
 app.get("/stocks", (req, res) => {

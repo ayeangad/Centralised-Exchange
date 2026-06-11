@@ -13,9 +13,10 @@ export type ToEngine =
   | { messageType: "get_all_orders"; userId: string; }
   | { messageType: "cancel_order"; userId: string, orderId: string }
   | { messageType: "create_market"; marketId: number }
-  | { messageType: "onramp"; userId: string, amount: string; }
+  | { messageType: "onramp"; userId: string, amount: number; }
   | { messageType: "available_equity"; userId: string; }
   | { messageType: "create_perporder"; userId: string; symbol: string; side: Side; type: OrderType; intent: Intent; qty: number; margin: number; price: number; leverage: number; }
+  | { messageType: "get_perp_orders"; userId: string }
 
 export type EngineRequest = ToEngine & {
   loopbackId: string;
@@ -80,7 +81,7 @@ export interface RestingOrder {
   symbol: string;
   price: number;
   qty: number;
-  leverage: number;
+  leverage?: number;
   filledQty: number;
   status: OrderStatus;
   createdAt: number;
@@ -101,7 +102,7 @@ export interface OrderRecord {
   symbol: string;
   price: number | null;
   qty: number;
-  leverage: number;
+  leverage?: number;
   filledQty: number;
   status: OrderStatus;
   fills: Fill[];
@@ -119,7 +120,7 @@ export interface Fill {
   symbol: string;
   price: number;
   qty: number;
-  leverage: number;
+  leverage?: number;
   buyOrderId: string;
   sellOrderId: string;
   createdAt: number;
@@ -140,6 +141,7 @@ export interface DepthResponse {
 
 export const STOCKS = ["BTC", "SOL", "ETH", "USDC"]
 export const BALANCES = new Map<string, Record<string, Balance>>()
+export const INSURANCE_FUND = { balance: 0 }
 export const ORDERBOOK: Record<string, OrderBook> = {};
 export const ORDERS = new Map<string, OrderRecord>();
 export const POSITIONS = new Map<string, Positions>();

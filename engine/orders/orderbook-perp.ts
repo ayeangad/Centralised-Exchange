@@ -300,3 +300,14 @@ export function onRamp(input: Extract<ToEngine, { messageType: "onramp" }>): num
   userBal.available += amount
   return userBal.available
 }
+
+export function getPerpOrders(input: Extract<ToEngine, { messageType: "get_perp_orders" }>) {
+  const { userId } = input
+  const orders = []
+  for (const order of ORDERS.values()) {
+    if (order.intent) {
+      if (order.userId === userId) orders.push(order)
+    }
+  }
+  return orders
+}
