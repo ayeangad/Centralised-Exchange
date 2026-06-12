@@ -261,7 +261,6 @@ app.post("/onramp", authMiddleware, async (req, res) => {
   if (!userId) return;
   const { amount } = req.body
 
-  console.log("hello")
   const queueLoopbackResponse = await loopback({
     messageType: "onramp", userId, amount
   })
