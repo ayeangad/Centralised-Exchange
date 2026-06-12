@@ -16,7 +16,7 @@ The system is decoupled into isolated services to ensure the core matching loop 
 
 ### 1. Clone & Install
 ```bash
-git clone [https://github.com/ayeangad/Centralised-Exchange.git](https://github.com/ayeangad/Centralised-Exchange.git)
+git clone https://github.com/ayeangad/Centralised-Exchange.git
 cd Centralised-Exchange
 bun install
 ```
